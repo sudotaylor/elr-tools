@@ -1,11 +1,12 @@
 import os
 import re
+import csv
 from lxml import etree
 from zipfile import ZipFile
 
 ## Contants: (change these as necessary)
 rrOrganizationName: str = "Local Public Health Authority"
-os.chdir('./Data Science Projects')
+os.chdir("./Data Science Projects")
 
 class Address:
     street: str = ""
@@ -66,19 +67,25 @@ class Person:
         self.rrReasons2 = []
         if self.rrContent is not None:
             for content in self.rrContent:
-                paragraphs: list[etree._Element] = content.xpath('./paragraph')
+                paragraphs: list[etree._Element] = content.xpath("./paragraph")
                 for i in range(len(paragraphs)):
-                    c: str = paragraphs[i].xpath('./content[1]/text()')[0]
-                    if re.search(rrOrganizationName, c) is not None:
-                        self.rrReasons1.append(c.split('"')[1])
-                        self.rrReasons2.append(paragraphs[i+1].xpath('./text()')[0].split('"')[1])
-                        i += 1
+                    try:
+                        c: str = paragraphs[i].xpath("./content[1]/text()")[0]
+                        if re.search(rrOrganizationName, c) is not None:
+                            self.rrReasons1.append(c.split('"')[1])
+                            self.rrReasons2.append(paragraphs[i+1].xpath("./text()")[0].split('"')[1])
+                            i += 1
+                    except:
+                        continue
     def toStringHeaders(self) -> str:
-        #return("\t".join(["ID", "First Name", "Middle Name", "Last Name", "Date of Birth", "Gender", "Race", "Ethnicity", "Preferred Language", "isDead?", "Date of Death", "Telecom List", "Phone(s)", "Email(s)"]))
         return("\t".join(["ID", "First Name", "Middle Name", "Last Name", "Date of Birth", "Gender", "Race", "Ethnicity", "Preferred Language", "isDead?", "Date of Death", "Phone(s)", "Email(s)", "Address - Street", "Address - City", "Address - State", "Address - Postal Code", "Sender - Name", "Sender - Street", "Sender - City", "Sender - State", "Sender - Postal Code", "RR_Reason1", "RR_Reason2"]))
+    def toListHeaders(self) -> list[str]:
+        return(["ID", "First Name", "Middle Name", "Last Name", "Date of Birth", "Gender", "Race", "Ethnicity", "Preferred Language", "isDead?", "Date of Death", "Phone(s)", "Email(s)", "Address - Street", "Address - City", "Address - State", "Address - Postal Code", "Sender - Name", "Sender - Street", "Sender - City", "Sender - State", "Sender - Postal Code", "RR_Reason1", "RR_Reason2"])
     def toString(self) -> str:
-        #return("\t".join([self.id, self.fname, self.mname, self.lname, self.birthDate, self.gender, self.race, self.ethnicity, self.pLanguage, self.isDead, self.deathDate, str(self.telecomList), self.phones, self.emails]))
         return("\t".join([self.id, self.fname, self.mname, self.lname, self.birthDate, self.gender, self.race, self.ethnicity, self.pLanguage, self.isDead, self.deathDate, self.phones, self.emails, self.address.street, self.address.city, self.address.state, self.address.postalCode, self.senderName, self.senderAddress.street, self.senderAddress.city, self.senderAddress.state, self.senderAddress.postalCode, ', '.join(self.rrReasons1), ', '.join(self.rrReasons2)]))
+    def toList(self) -> list[str]:
+        return([self.id, self.fname, self.mname, self.lname, self.birthDate, self.gender, self.race, self.ethnicity, self.pLanguage, self.isDead, self.deathDate, self.phones, self.emails, self.address.street, self.address.city, self.address.state, self.address.postalCode, self.senderName, self.senderAddress.street, self.senderAddress.city, self.senderAddress.state, self.senderAddress.postalCode, ', '.join(self.rrReasons1), ', '.join(self.rrReasons2)])
+
 
 def extractXmlPatient(record: etree._Element, record2: etree._Element) -> Person:
     p: Person = Person()
@@ -95,8 +102,9 @@ def extractXmlPatient(record: etree._Element, record2: etree._Element) -> Person
     
     attributes: list[Attr] = [
         Attr().update(
-            1, 'id', record.xpath('./recordTarget/patientRole/id[1]/@extension')
+            1, 'id', record.xpath('./id/@root')
         ),
+        ## alternatively, combine fname and mname into 'givenName' and combine all given names, in case more than 2 occur
         Attr().update(
             1, 'fname', record.xpath('./recordTarget/patientRole/patient/name[@use="L"]/given[1]/text()')
         ),
@@ -131,7 +139,7 @@ def extractXmlPatient(record: etree._Element, record2: etree._Element) -> Person
             -1, 'telecomList', record.xpath('./recordTarget/patientRole/telecom/@value')
         ),
         Attr().update(
-            1, 'address.street', record.xpath('./recordTarget/patientRole/addr[1]/streetAddressLine/text()')
+            -2, 'address.street', record.xpath('./recordTarget/patientRole/addr[1]/streetAddressLine/text()')
         ),
         Attr().update(
             1, 'address.city', record.xpath('./recordTarget/patientRole/addr[1]/city/text()')
@@ -146,7 +154,7 @@ def extractXmlPatient(record: etree._Element, record2: etree._Element) -> Person
             1, 'senderName', record.xpath('./recordTarget/patientRole/providerOrganization/name/text()')
         ),
         Attr().update(
-            1, 'senderAddress.street', record.xpath('./recordTarget/patientRole/providerOrganization/addr[1]/streetAddressLine/text()')
+            -2, 'senderAddress.street', record.xpath('./recordTarget/patientRole/providerOrganization/addr[1]/streetAddressLine/text()')
         ),
         Attr().update(
             1, 'senderAddress.city', record.xpath('./recordTarget/patientRole/providerOrganization/addr[1]/city/text()')
@@ -159,28 +167,27 @@ def extractXmlPatient(record: etree._Element, record2: etree._Element) -> Person
         ),
         Attr().update(
             # Note that this is in record2 (second xml file, which corresponds to RR)
-            -1, 'rrContent', record2.xpath('./component/structuredBody/component[3]/section/text') # this should always exist here, but may need to confirm it is always component[3]...
+            -1, 'rrContent', record2.xpath('./component/structuredBody/component[3]/section/text') # assumes this structure is always found in component[3]...
         )
     ]
 
     for a in attributes:
         if a.path != None:
+            listAttr: list[str] = a.attribName.split('.')
+            obj: Person = p
+            for i in range(len(listAttr)-1):
+                obj = obj.__getattribute__(listAttr[i]) # move to child object
             if len(a.path) == a.numArgs:
                 if a.numArgs == 1:
-                    listAttr: list[str] = a.attribName.split('.')
-                    if len(listAttr) > 1:
-                        obj: Person = p
-                        for i in range(len(listAttr)-1):
-                            obj = obj.__getattribute__(listAttr[i]) # move to child object
-                        obj.__setattr__(listAttr[-1], a.path[0])
-                    else:
-                        p.__setattr__(a.attribName, a.path[0])
+                    obj.__setattr__(listAttr[-1], a.path[0])
                 elif a.numArgs > 1: ## multiple args, comma-seperated (can change to list if needed)
-                    p.__setattr__(a.attribName, ", ".join(a.path))
+                    obj.__setattr__(listAttr[-1], ', '.join(a.path))
                 else:
                     print(f"Error: Invalid number of arguments in {a.attribName}. Expected {a.numArgs}, but this is not a valid option - check the configuration.") ## should never occur
             elif a.numArgs == -1: ## add as list
-                p.__setattr__(a.attribName, a.path)
+                obj.__setattr__(listAttr[-1], a.path)
+            elif a.numArgs == -1: ## add as ", "-delimited string
+                obj.__setattr__(listAttr[-1], ', '.join(a.path))
             elif len(a.path) == 0:
                 pass ## empty - may not be required - use validation to check
             else:
@@ -199,7 +206,7 @@ def unzipFiles(zipDir: str, unzipDir: str) -> None:
     zipFilesList: list[str] = [f for f in os.listdir(zipDir) if str(f).endswith(".zip")]
     for zipFile in zipFilesList:
         with ZipFile((os.sep).join([zipDir,zipFile]), 'r') as z:
-            z.extractall(unzipDir)
+            z.extractall((os.sep).join([unzipDir,zipFile])[:-4])
 
 def acquireEcrFileList(xmlRootDir: str, eICRDocument: str, RRDocument: str) -> list[list[str]]:
     xmlSubDirList: list[str] = os.listdir(xmlRootDir)
@@ -213,10 +220,10 @@ def ecrFileListOverride() -> list[list[str]]:
         ["./data/test/eICR_002.xml", "./data/test/RR_002.xml"]
     ])
 
-def processEcrFileList(ecrXmlFiles: list[list[str]], outputFileName: str) -> None:
+def processEcrFileList(ecrXmlFiles: list[list[str]], outputFileName: str, delim: str = '\t') -> None:
     with open(outputFileName, 'w') as f:
-        f.write(Person().toStringHeaders + '\n')
-    with open(outputFileName, 'a') as f:
+        fw: csv._writer = csv.writer(f, delimiter=delim, lineterminator='\n')
+        fw.writerow(Person().toListHeaders())
         for (xmlFile1, xmlFile2) in ecrXmlFiles:
             xmltree1: etree._ElementTree = etree.parse(xmlFile1)
             root1: etree._Element = xmltree1.getroot()
@@ -234,7 +241,7 @@ def processEcrFileList(ecrXmlFiles: list[list[str]], outputFileName: str) -> Non
             if not (isinstance(element, etree._Comment) or isinstance(element, etree._ProcessingInstruction)):
                 element.tag = etree.QName(element).localname
         etree.cleanup_namespaces(root2)
-    f.write(extractXmlPatient(root1, root2).toString( + '\n'))
+        fw.writerow(extractXmlPatient(root1, root2).toList())
 
 
 
@@ -242,7 +249,7 @@ def processEcrFileList(ecrXmlFiles: list[list[str]], outputFileName: str) -> Non
 ## Change directories / filenames for the functions as needed.
 
 
-unzipFiles('./data/zipped', './data/unzipped')
-files: list[list[str]] = acquireEcrFileList('./data/unzipped', "CDA_eICR.xml", "CDA_RR.xml")
+unzipFiles("./data/zipped", "./data/unzipped")
+files: list[list[str]] = acquireEcrFileList("./data/unzipped", "CDA_eICR.xml", "CDA_RR.xml")
 #files: list[list[str]] = ecrFileListOverride()
-processEcrFileList(files)
+processEcrFileList(files, "output.tsv")
