@@ -4,7 +4,7 @@ import csv
 from lxml import etree
 from zipfile import ZipFile
 
-## Contants: (change these as necessary)
+## Constants: (change these as necessary)
 rrOrganizationName: str = "Local Public Health Authority"
 os.chdir("./Data Science Projects")
 
@@ -44,10 +44,13 @@ class Person:
     deathDate: str = ""
     telecomList: list[str] = []
     phones: str = ""
+    phonesExcelFriendly: str = ""   # leading '+' on phone numbers removed due to issue with default interpretation of CSV in MS Excel (converts '+' to '=' when detecting numeric context)
+                                    # Alternatively, another column with the following formula can be added to correct behavior (the original column must remain and appropriate letter assigned to constant "colLetter", rowNumber should be incremented and start at 1):
+                                    # "=IF(ISNUMBER(SEARCH(\"=\",FORMULATEXT(" + colLetter + rowNumber + "))),SUBSTITUTE(FORMULATEXT(" + colLetter + rowNumber + "),\"=\",\"+\")," + colLetter + rowNumber + ")"
     emails: str = ""
-    address: Address = Address() # currently only takes one address, though XML allows multiple
+    address: Address = Address()    # currently only takes one address, though XML allows multiple
     senderName: str = ""
-    senderAddress: Address = Address() # currently only takes one address, though XML allows multiple
+    senderAddress: Address = Address()  # currently only takes one address, though XML allows multiple
     rrContent: etree._Element
     rrReasons1: list[str] = []
     rrReasons2: list[str] = []
@@ -60,6 +63,7 @@ class Person:
             elif telecom.startswith("mailto:"):
                 emails.append(telecom[7:])
         self.phones = ", ".join(phones)
+        self.phones = ", ".join([(phone[1:] if phone[0]=='+' else phone) for phone in phones])  # strings are arrays :)
         self.emails = ", ".join(emails)
     def updateRRContent(self) -> None:
         # Clear existing first, as these will be repopulated by self.rrContent
@@ -77,15 +81,28 @@ class Person:
                             i += 1
                     except:
                         continue
-    def toStringHeaders(self) -> str:
-        return("\t".join(["ID", "First Name", "Middle Name", "Last Name", "Date of Birth", "Gender", "Race", "Ethnicity", "Preferred Language", "isDead?", "Date of Death", "Phone(s)", "Email(s)", "Address - Street", "Address - City", "Address - State", "Address - Postal Code", "Sender - Name", "Sender - Street", "Sender - City", "Sender - State", "Sender - Postal Code", "RR_Reason1", "RR_Reason2"]))
-    def toListHeaders(self) -> list[str]:
-        return(["ID", "First Name", "Middle Name", "Last Name", "Date of Birth", "Gender", "Race", "Ethnicity", "Preferred Language", "isDead?", "Date of Death", "Phone(s)", "Email(s)", "Address - Street", "Address - City", "Address - State", "Address - Postal Code", "Sender - Name", "Sender - Street", "Sender - City", "Sender - State", "Sender - Postal Code", "RR_Reason1", "RR_Reason2"])
-    def toString(self) -> str:
-        return("\t".join([self.id, self.fname, self.mname, self.lname, self.birthDate, self.gender, self.race, self.ethnicity, self.pLanguage, self.isDead, self.deathDate, self.phones, self.emails, self.address.street, self.address.city, self.address.state, self.address.postalCode, self.senderName, self.senderAddress.street, self.senderAddress.city, self.senderAddress.state, self.senderAddress.postalCode, ', '.join(self.rrReasons1), ', '.join(self.rrReasons2)]))
-    def toList(self) -> list[str]:
-        return([self.id, self.fname, self.mname, self.lname, self.birthDate, self.gender, self.race, self.ethnicity, self.pLanguage, self.isDead, self.deathDate, self.phones, self.emails, self.address.street, self.address.city, self.address.state, self.address.postalCode, self.senderName, self.senderAddress.street, self.senderAddress.city, self.senderAddress.state, self.senderAddress.postalCode, ', '.join(self.rrReasons1), ', '.join(self.rrReasons2)])
-
+    def toStringHeaders(self, useExcelFriendly: bool = False) -> str:
+        if useExcelFriendly:
+            ## For now, this displays the same, but it can be modified to indicate Excel-friendly printing
+            return("\t".join(["ID", "First Name", "Middle Name", "Last Name", "Date of Birth", "Gender", "Race", "Ethnicity", "Preferred Language", "isDead?", "Date of Death", "Phone(s)", "Email(s)", "Address - Street", "Address - City", "Address - State", "Address - Postal Code", "Sender - Name", "Sender - Street", "Sender - City", "Sender - State", "Sender - Postal Code", "RR_Reason1", "RR_Reason2"]))
+        else:
+            return("\t".join(["ID", "First Name", "Middle Name", "Last Name", "Date of Birth", "Gender", "Race", "Ethnicity", "Preferred Language", "isDead?", "Date of Death", "Phone(s)", "Email(s)", "Address - Street", "Address - City", "Address - State", "Address - Postal Code", "Sender - Name", "Sender - Street", "Sender - City", "Sender - State", "Sender - Postal Code", "RR_Reason1", "RR_Reason2"]))
+    def toListHeaders(self, useExcelFriendly: bool = False) -> list[str]:
+        if useExcelFriendly:
+            ## For now, this displays the same, but it can be modified to indicate Excel-friendly printing
+            return(["ID", "First Name", "Middle Name", "Last Name", "Date of Birth", "Gender", "Race", "Ethnicity", "Preferred Language", "isDead?", "Date of Death", "Phone(s)", "Email(s)", "Address - Street", "Address - City", "Address - State", "Address - Postal Code", "Sender - Name", "Sender - Street", "Sender - City", "Sender - State", "Sender - Postal Code", "RR_Reason1", "RR_Reason2"])
+        else:
+            return(["ID", "First Name", "Middle Name", "Last Name", "Date of Birth", "Gender", "Race", "Ethnicity", "Preferred Language", "isDead?", "Date of Death", "Phone(s)", "Email(s)", "Address - Street", "Address - City", "Address - State", "Address - Postal Code", "Sender - Name", "Sender - Street", "Sender - City", "Sender - State", "Sender - Postal Code", "RR_Reason1", "RR_Reason2"])
+    def toString(self, useExcelFriendly: bool = False) -> str:
+        if useExcelFriendly:
+            return("\t".join([self.id, self.fname, self.mname, self.lname, self.birthDate, self.gender, self.race, self.ethnicity, self.pLanguage, self.isDead, self.deathDate, self.phonesExcelFriendly, self.emails, self.address.street, self.address.city, self.address.state, self.address.postalCode, self.senderName, self.senderAddress.street, self.senderAddress.city, self.senderAddress.state, self.senderAddress.postalCode, ', '.join(self.rrReasons1), ', '.join(self.rrReasons2)]))
+        else:
+            return("\t".join([self.id, self.fname, self.mname, self.lname, self.birthDate, self.gender, self.race, self.ethnicity, self.pLanguage, self.isDead, self.deathDate, self.phones, self.emails, self.address.street, self.address.city, self.address.state, self.address.postalCode, self.senderName, self.senderAddress.street, self.senderAddress.city, self.senderAddress.state, self.senderAddress.postalCode, ', '.join(self.rrReasons1), ', '.join(self.rrReasons2)]))
+    def toList(self, useExcelFriendly: bool = False) -> list[str]:
+        if useExcelFriendly:
+            return([self.id, self.fname, self.mname, self.lname, self.birthDate, self.gender, self.race, self.ethnicity, self.pLanguage, self.isDead, self.deathDate, self.phonesExcelFriendly, self.emails, self.address.street, self.address.city, self.address.state, self.address.postalCode, self.senderName, self.senderAddress.street, self.senderAddress.city, self.senderAddress.state, self.senderAddress.postalCode, ', '.join(self.rrReasons1), ', '.join(self.rrReasons2)])
+        else:
+            return([self.id, self.fname, self.mname, self.lname, self.birthDate, self.gender, self.race, self.ethnicity, self.pLanguage, self.isDead, self.deathDate, self.phones, self.emails, self.address.street, self.address.city, self.address.state, self.address.postalCode, self.senderName, self.senderAddress.street, self.senderAddress.city, self.senderAddress.state, self.senderAddress.postalCode, ', '.join(self.rrReasons1), ', '.join(self.rrReasons2)])
 
 def extractXmlPatient(record: etree._Element, record2: etree._Element) -> Person:
     p: Person = Person()
@@ -167,7 +184,7 @@ def extractXmlPatient(record: etree._Element, record2: etree._Element) -> Person
         ),
         Attr().update(
             # Note that this is in record2 (second xml file, which corresponds to RR)
-            -1, 'rrContent', record2.xpath('./component/structuredBody/component[3]/section/text') # assumes this structure is always found in component[3]...
+            -1, 'rrContent', record2.xpath('./component/structuredBody/component[3]/section/text')  # assumes this structure is always found in component[3]...
         )
     ]
 
@@ -181,15 +198,15 @@ def extractXmlPatient(record: etree._Element, record2: etree._Element) -> Person
                 if a.numArgs == 1:
                     obj.__setattr__(listAttr[-1], a.path[0])
                 elif a.numArgs > 1: ## multiple args, comma-seperated (can change to list if needed)
-                    obj.__setattr__(listAttr[-1], ', '.join(a.path))
+                    obj.__setattr__(listAttr[-1], ", ".join(a.path))
                 else:
                     print(f"Error: Invalid number of arguments in {a.attribName}. Expected {a.numArgs}, but this is not a valid option - check the configuration.") ## should never occur
-            elif a.numArgs == -1: ## add as list
+            elif a.numArgs == -1:   ## add as list
                 obj.__setattr__(listAttr[-1], a.path)
-            elif a.numArgs == -1: ## add as ", "-delimited string
-                obj.__setattr__(listAttr[-1], ', '.join(a.path))
+            elif a.numArgs == -1:   ## add as ", "-delimited string
+                obj.__setattr__(listAttr[-1], ", ".join(a.path))
             elif len(a.path) == 0:
-                pass ## empty - may not be required - use validation to check
+                pass    ## empty - may not be required - use validation to check
             else:
                 print(f"Error: Incorrect number of arguments in {a.attribName}. Expected {a.numArgs}, but found {len(a.path)}.")
     p.updateTelecom()
@@ -220,10 +237,10 @@ def ecrFileListOverride() -> list[list[str]]:
         ["./data/test/eICR_002.xml", "./data/test/RR_002.xml"]
     ])
 
-def processEcrFileList(ecrXmlFiles: list[list[str]], outputFileName: str, delim: str = '\t') -> None:
+def processEcrFileList(ecrXmlFiles: list[list[str]], outputFileName: str, delim: str = ',', useExcelFriendly: bool = False) -> None:
     with open(outputFileName, 'w') as f:
         fw: csv._writer = csv.writer(f, delimiter=delim, lineterminator='\n')
-        fw.writerow(Person().toListHeaders())
+        fw.writerow(Person().toListHeaders(useExcelFriendly))
         for (xmlFile1, xmlFile2) in ecrXmlFiles:
             xmltree1: etree._ElementTree = etree.parse(xmlFile1)
             root1: etree._Element = xmltree1.getroot()
@@ -241,7 +258,7 @@ def processEcrFileList(ecrXmlFiles: list[list[str]], outputFileName: str, delim:
             if not (isinstance(element, etree._Comment) or isinstance(element, etree._ProcessingInstruction)):
                 element.tag = etree.QName(element).localname
         etree.cleanup_namespaces(root2)
-        fw.writerow(extractXmlPatient(root1, root2).toList())
+        fw.writerow(extractXmlPatient(root1, root2).toList(useExcelFriendly))
 
 
 
@@ -252,4 +269,5 @@ def processEcrFileList(ecrXmlFiles: list[list[str]], outputFileName: str, delim:
 unzipFiles("./data/zipped", "./data/unzipped")
 files: list[list[str]] = acquireEcrFileList("./data/unzipped", "CDA_eICR.xml", "CDA_RR.xml")
 #files: list[list[str]] = ecrFileListOverride()
-processEcrFileList(files, "output.tsv")
+#processEcrFileList(files, "output.tsv", '\t')
+processEcrFileList(files, "output.csv", ',', True)
