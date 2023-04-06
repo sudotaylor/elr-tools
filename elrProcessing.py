@@ -15,10 +15,10 @@ class Address:
     postalCode: str = ""
     county: str = ""
     country: str = ""
-    def __init__(self, *args) -> None:
+    def __init__(self, *args) -> None: ## not currently implemented - this would allow an address to be interpreted from different sources (list[str] or string)
         if len(args) < 1:
             pass
-        elif len(args) == 1 and isinstance(args[0], list):
+        elif len(args) == 1 and isinstance(args[0], list[str]):
             pass
         elif len(args) == 1 and isinstance(args[0], str):
             pass
@@ -26,8 +26,10 @@ class Address:
             print(f"Warning: single argument provided, but unusable type.\n\tArg: {args[0]}\n\tType: {type(args[0])}")
         else:
             print(f"Warning: multiple arguments provided (all were ignored).\n\tArgs: {', '.join(args)}")
-    def toString(self) -> str:
-        return(f"{self.street}, {self.city}, {self.state}, {self.postalCode}") # county and country excluded for now
+    def __repr__(self) -> str: ## default string
+        return(f"{self.street}, {self.city}, {self.state}, {self.postalCode}") # county and country could also be included
+    def toStringLetterFormat(self) -> str: # Just an example of alternative string output
+        return(f"{self.street}\n{self.city}, {self.state} {self.postalCode}")
 
 
 class Person:
@@ -51,7 +53,7 @@ class Person:
     address: Address = Address()    # currently only takes one address, though XML allows multiple
     senderName: str = ""
     senderAddress: Address = Address()  # currently only takes one address, though XML allows multiple
-    rrContent: etree._Element
+    rrContent: etree._Element = None
     rrReasons1: list[str] = []
     rrReasons2: list[str] = []
     def updateTelecom(self) -> None:
@@ -111,78 +113,77 @@ def extractXmlPatient(record: etree._Element, record2: etree._Element) -> Person
         numArgs: int = 0
         attribName: str = ""
         path: any = ""
-        def update(self, numArgs: int, attribName: str, path: any):
+        def __init__(self, numArgs: int = 0, attribName: str = "", path: any = "") -> None:
             self.numArgs = numArgs
             self.attribName = attribName
             self.path = path
-            return self
     
     attributes: list[Attr] = [
-        Attr().update(
+        Attr(
             1, 'id', record.xpath('./id/@root')
         ),
         ## alternatively, combine fname and mname into 'givenName' and combine all given names, in case more than 2 occur
-        Attr().update(
+        Attr(
             1, 'fname', record.xpath('./recordTarget/patientRole/patient/name[@use="L"]/given[1]/text()')
         ),
-        Attr().update(
+        Attr(
             1, 'mname', record.xpath('./recordTarget/patientRole/patient/name[@use="L"]/given[2]/text()')
         ),
-        Attr().update(
+        Attr(
             1, 'lname', record.xpath('./recordTarget/patientRole/patient/name[@use="L"]/family/text()')
         ),
-        Attr().update(
+        Attr(
             1, 'birthDate', record.xpath('./recordTarget/patientRole/patient/birthTime/@value')
         ),
-        Attr().update(
+        Attr(
             1, 'gender', record.xpath('./recordTarget/patientRole/patient/administrativeGenderCode/@displayName')
         ),
-        Attr().update(
+        Attr(
             1, 'race', record.xpath('./recordTarget/patientRole/patient/raceCode[1]/@displayName')
         ),
-        Attr().update(
+        Attr(
             1, 'ethnicity', record.xpath('./recordTarget/patientRole/patient/ethnicGroupCode/@displayName')
         ),
-        Attr().update(
+        Attr(
             1, 'pLanguage', record.xpath('./recordTarget/patientRole/patient/languageCommunication/languageCode/@code')
         ),
-        Attr().update(
+        Attr(
             1, 'isDead', record.xpath('./recordTarget/patientRole/patient/deceasedInd/@value')
         ),
-        Attr().update(
+        Attr(
             1, 'deathDate', record.xpath('./recordTarget/patientRole/patient/deceasedTime/@value')
         ),
-        Attr().update(
+        Attr(
             -1, 'telecomList', record.xpath('./recordTarget/patientRole/telecom/@value')
         ),
-        Attr().update(
+        Attr(
             -2, 'address.street', record.xpath('./recordTarget/patientRole/addr[1]/streetAddressLine/text()')
         ),
-        Attr().update(
+        Attr(
             1, 'address.city', record.xpath('./recordTarget/patientRole/addr[1]/city/text()')
         ),
-        Attr().update(
+        Attr(
             1, 'address.state', record.xpath('./recordTarget/patientRole/addr[1]/state/text()')
         ),
-        Attr().update(
+        Attr(
             1, 'address.postalCode', record.xpath('./recordTarget/patientRole/addr[1]/postalCode/text()')
         ),
-        Attr().update(
+        Attr(
             1, 'senderName', record.xpath('./recordTarget/patientRole/providerOrganization/name/text()')
         ),
-        Attr().update(
+        Attr(
             -2, 'senderAddress.street', record.xpath('./recordTarget/patientRole/providerOrganization/addr[1]/streetAddressLine/text()')
         ),
-        Attr().update(
+        Attr(
             1, 'senderAddress.city', record.xpath('./recordTarget/patientRole/providerOrganization/addr[1]/city/text()')
         ),
-        Attr().update(
+        Attr(
             1, 'senderAddress.state', record.xpath('./recordTarget/patientRole/providerOrganization/addr[1]/state/text()')
         ),
-        Attr().update(
+        Attr(
             1, 'senderAddress.postalCode', record.xpath('./recordTarget/patientRole/providerOrganization/addr[1]/postalCode/text()')
         ),
-        Attr().update(
+        Attr(
             # Note that this is in record2 (second xml file, which corresponds to RR)
             -1, 'rrContent', record2.xpath('./component/structuredBody/component[3]/section/text')  # assumes this structure is always found in component[3]...
         )
