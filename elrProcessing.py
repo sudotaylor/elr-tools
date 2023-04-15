@@ -76,8 +76,8 @@ class Person:
             if content is not None:
                 self.rrReasons1.append(content.group(1))
                 self.rrReasons2.append(content.group(2))
-            else:
-                print(f"No RR content found for record ({self.id})")
+        else:
+            print(f"No RR content found for record ({self.id})")
     def toStringHeaders(self, useExcelFriendly: bool = False) -> str:
         if useExcelFriendly:
             ## For now, this displays the same, but it can be modified to indicate Excel-friendly printing
@@ -140,7 +140,7 @@ def extractXmlPatient(record: etree._Element, record2: etree._Element) -> Person
             1, 'ethnicity', record.xpath('./recordTarget/patientRole/patient/ethnicGroupCode/@displayName')
         ),
         Attribute(
-            1, 'pLanguage', record.xpath('./recordTarget/patientRole/patient/languageCommunication/languageCode/@code')
+            1, 'pLanguage', record.xpath('./recordTarget/patientRole/patient/languageCommunication[1]/languageCode/@code')  # uses only the first language code
         ),
         Attribute(
             1, 'isDead', record.xpath('./recordTarget/patientRole/patient/deceasedInd/@value')
@@ -187,14 +187,14 @@ def extractXmlPatient(record: etree._Element, record2: etree._Element) -> Person
     ## Populate Person object with attributes
     for a in attributes:
         if a.path != None:
-            attributeExpandedList: list[str] = a.attributeName.split('.')
+            attributeExpandedList: list[str] = a.attributeName.split('.')   # expand nested attributes
             obj: Person = p
-            for i in range(len(attributeExpandedList)-1):
-                obj = obj.__getattribute__(attributeExpandedList[i]) # move to child object
+            for i in range(len(attributeExpandedList)-1):   # navigate through nesting as necessary
+                obj = obj.__getattribute__(attributeExpandedList[i])
             if len(a.path) == a.numArgs:
                 if a.numArgs == 1:
                     obj.__setattr__(attributeExpandedList[-1], a.path[0])
-                elif a.numArgs > 1: # multiple args, comma-seperated (can change to list if needed)
+                elif a.numArgs > 1: # multiple args, ", "-seperated (can change to list instead, if needed)
                     obj.__setattr__(attributeExpandedList[-1], ", ".join(a.path))
                 else:
                     print(f"Error: Invalid number of arguments in {a.attributeName}. Expected {a.numArgs}, but this is not a valid option - check the configuration.") ## should never occur
@@ -215,7 +215,7 @@ def extractXmlPatient(record: etree._Element, record2: etree._Element) -> Person
     if not re.match(r'^\d{8}$', p.birthDate):   # validate: format should be in "YYYYMMDD"
         print(f"FATAL ERROR: Invalid date format found.\n\tPerson ID: {p.id}\n\tDOB: {p.birthDate}\n")
         exit(1)
-    p.birthDate = re.sub(r'^(\d{4})(\d{2})(\d{2})$', r'\2-\3-\1', p.birthDate)   # transform
+    p.birthDate = re.sub(r'^(\d{4})(\d{2})(\d{2})$', r'\2-\3-\1', p.birthDate)  # transform
 
     ## isDead & deathDate:
     if p.isDead == "false":
@@ -258,7 +258,7 @@ def processEcrFileList(ecrXmlFiles: list[list[str]], outputFileName: str, delim:
             root1: etree._Element = xmltree1.getroot()
             xmltree2: etree._ElementTree = etree.parse(xmlFile2)
             root2: etree._Element = xmltree2.getroot()
-        ## (strip all namespaces):
+        ## (strip all namespaces): (note that if this is not acceptable, changes will need to be made to retain namespace information)
         for element in root1.getiterator():
             if not (isinstance(element, etree._Comment) or isinstance(element, etree._ProcessingInstruction)):
                 element.tag = etree.QName(element).localname
