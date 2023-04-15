@@ -13,9 +13,9 @@ class Address:
     city: str = ""
     state: str = ""
     postalCode: str = ""
-    county: str = ""
-    country: str = ""
-    def __init__(self, *args) -> None: ## not currently implemented - this would allow an address to be interpreted from different sources (list[str] or string)
+    county: str = ""    # currently unused
+    country: str = ""   # currently unused
+    def __init__(self, *args) -> None: # not currently implemented - this would allow an address to be interpreted from different sources (list[str] or string)
         if len(args) < 1:
             pass
         elif len(args) == 1 and isinstance(args[0], list[str]):
@@ -26,7 +26,7 @@ class Address:
             print(f"Warning: single argument provided, but unusable type.\n\tArg: {args[0]}\n\tType: {type(args[0])}")
         else:
             print(f"Warning: multiple arguments provided (all were ignored).\n\tArgs: {', '.join(args)}")
-    def __repr__(self) -> str: ## default string
+    def __repr__(self) -> str: # default string
         return(f"{self.street}, {self.city}, {self.state}, {self.postalCode}") # county and country could also be included
     def toStringLetterFormat(self) -> str: # Just an example of alternative string output
         return(f"{self.street}\n{self.city}, {self.state} {self.postalCode}")
@@ -65,24 +65,19 @@ class Person:
             elif telecom.startswith("mailto:"):
                 emails.append(telecom[7:])
         self.phones = ", ".join(phones)
-        self.phones = ", ".join([(phone[1:] if phone[0]=='+' else phone) for phone in phones])  # strings are arrays :)
+        self.phonesExcelFriendly = ", ".join([(phone[1:] if phone[0]=='+' else phone) for phone in phones])  # strings are arrays :)
         self.emails = ", ".join(emails)
     def updateRRContent(self) -> None:
         # Clear existing first, as these will be repopulated by self.rrContent
         self.rrReasons1 = []
         self.rrReasons2 = []
         if self.rrContent is not None:
-            for content in self.rrContent:
-                paragraphs: list[etree._Element] = content.xpath("./paragraph")
-                for i in range(len(paragraphs)):
-                    try:
-                        c: str = paragraphs[i].xpath("./content[1]/text()")[0]
-                        if re.search(rrOrganizationName, c) is not None:
-                            self.rrReasons1.append(c.split('"')[1])
-                            self.rrReasons2.append(paragraphs[i+1].xpath("./text()")[0].split('"')[1])
-                            i += 1
-                    except:
-                        continue
+            content: re.Match[str] | None = re.search("<paragraph><content.+?>\"(.+?)\".+\"" + rrOrganizationName + "\"\s+?</content></paragraph><paragraph>.+\"(.+?)\"<", str(etree.tostring(self.rrContent))) # may or may not have </br>
+            if content is not None:
+                self.rrReasons1.append(content.group(1))
+                self.rrReasons2.append(content.group(2))
+            else:
+                print(f"No RR content found for record ({self.id})")
     def toStringHeaders(self, useExcelFriendly: bool = False) -> str:
         if useExcelFriendly:
             ## For now, this displays the same, but it can be modified to indicate Excel-friendly printing
@@ -109,112 +104,128 @@ class Person:
 def extractXmlPatient(record: etree._Element, record2: etree._Element) -> Person:
     p: Person = Person()
 
-    class Attr:
-        numArgs: int = 0
-        attribName: str = ""
-        path: any = ""
-        def __init__(self, numArgs: int = 0, attribName: str = "", path: any = "") -> None:
-            self.numArgs = numArgs
-            self.attribName = attribName
-            self.path = path
-    
-    attributes: list[Attr] = [
-        Attr(
+    class Attribute:
+        def __init__(self, numArgs: int = 0, attributeName: str = "", path: any = "") -> None:
+            self.numArgs: int = numArgs
+            self.attributeName: str = attributeName
+            self.path: any = path
+
+    ### Extract XML data and load into object
+
+    ## Select attributes to be used
+    attributes: list[Attribute] = [
+        Attribute(
             1, 'id', record.xpath('./id/@root')
         ),
         ## alternatively, combine fname and mname into 'givenName' and combine all given names, in case more than 2 occur
-        Attr(
+        Attribute(
             1, 'fname', record.xpath('./recordTarget/patientRole/patient/name[@use="L"]/given[1]/text()')
         ),
-        Attr(
+        Attribute(
             1, 'mname', record.xpath('./recordTarget/patientRole/patient/name[@use="L"]/given[2]/text()')
         ),
-        Attr(
+        Attribute(
             1, 'lname', record.xpath('./recordTarget/patientRole/patient/name[@use="L"]/family/text()')
         ),
-        Attr(
+        Attribute(
             1, 'birthDate', record.xpath('./recordTarget/patientRole/patient/birthTime/@value')
         ),
-        Attr(
+        Attribute(
             1, 'gender', record.xpath('./recordTarget/patientRole/patient/administrativeGenderCode/@displayName')
         ),
-        Attr(
+        Attribute(
             1, 'race', record.xpath('./recordTarget/patientRole/patient/raceCode[1]/@displayName')
         ),
-        Attr(
+        Attribute(
             1, 'ethnicity', record.xpath('./recordTarget/patientRole/patient/ethnicGroupCode/@displayName')
         ),
-        Attr(
+        Attribute(
             1, 'pLanguage', record.xpath('./recordTarget/patientRole/patient/languageCommunication/languageCode/@code')
         ),
-        Attr(
+        Attribute(
             1, 'isDead', record.xpath('./recordTarget/patientRole/patient/deceasedInd/@value')
         ),
-        Attr(
+        Attribute(
             1, 'deathDate', record.xpath('./recordTarget/patientRole/patient/deceasedTime/@value')
         ),
-        Attr(
+        Attribute(
             -1, 'telecomList', record.xpath('./recordTarget/patientRole/telecom/@value')
         ),
-        Attr(
+        Attribute(
             -2, 'address.street', record.xpath('./recordTarget/patientRole/addr[1]/streetAddressLine/text()')
         ),
-        Attr(
+        Attribute(
             1, 'address.city', record.xpath('./recordTarget/patientRole/addr[1]/city/text()')
         ),
-        Attr(
+        Attribute(
             1, 'address.state', record.xpath('./recordTarget/patientRole/addr[1]/state/text()')
         ),
-        Attr(
+        Attribute(
             1, 'address.postalCode', record.xpath('./recordTarget/patientRole/addr[1]/postalCode/text()')
         ),
-        Attr(
+        Attribute(
             1, 'senderName', record.xpath('./recordTarget/patientRole/providerOrganization/name/text()')
         ),
-        Attr(
+        Attribute(
             -2, 'senderAddress.street', record.xpath('./recordTarget/patientRole/providerOrganization/addr[1]/streetAddressLine/text()')
         ),
-        Attr(
+        Attribute(
             1, 'senderAddress.city', record.xpath('./recordTarget/patientRole/providerOrganization/addr[1]/city/text()')
         ),
-        Attr(
+        Attribute(
             1, 'senderAddress.state', record.xpath('./recordTarget/patientRole/providerOrganization/addr[1]/state/text()')
         ),
-        Attr(
+        Attribute(
             1, 'senderAddress.postalCode', record.xpath('./recordTarget/patientRole/providerOrganization/addr[1]/postalCode/text()')
         ),
-        Attr(
+        Attribute(
             # Note that this is in record2 (second xml file, which corresponds to RR)
-            -1, 'rrContent', record2.xpath('./component/structuredBody/component[3]/section/text')  # assumes this structure is always found in component[3]...
+            1, 'rrContent', record2.xpath('./component/structuredBody/component[3]/section/text')  # assumes this structure is constant
         )
     ]
 
+    ## Populate Person object with attributes
     for a in attributes:
         if a.path != None:
-            listAttr: list[str] = a.attribName.split('.')
+            attributeExpandedList: list[str] = a.attributeName.split('.')
             obj: Person = p
-            for i in range(len(listAttr)-1):
-                obj = obj.__getattribute__(listAttr[i]) # move to child object
+            for i in range(len(attributeExpandedList)-1):
+                obj = obj.__getattribute__(attributeExpandedList[i]) # move to child object
             if len(a.path) == a.numArgs:
                 if a.numArgs == 1:
-                    obj.__setattr__(listAttr[-1], a.path[0])
-                elif a.numArgs > 1: ## multiple args, comma-seperated (can change to list if needed)
-                    obj.__setattr__(listAttr[-1], ", ".join(a.path))
+                    obj.__setattr__(attributeExpandedList[-1], a.path[0])
+                elif a.numArgs > 1: # multiple args, comma-seperated (can change to list if needed)
+                    obj.__setattr__(attributeExpandedList[-1], ", ".join(a.path))
                 else:
-                    print(f"Error: Invalid number of arguments in {a.attribName}. Expected {a.numArgs}, but this is not a valid option - check the configuration.") ## should never occur
-            elif a.numArgs == -1:   ## add as list
-                obj.__setattr__(listAttr[-1], a.path)
-            elif a.numArgs == -1:   ## add as ", "-delimited string
-                obj.__setattr__(listAttr[-1], ", ".join(a.path))
+                    print(f"Error: Invalid number of arguments in {a.attributeName}. Expected {a.numArgs}, but this is not a valid option - check the configuration.") ## should never occur
+            elif a.numArgs == -1:   # add as list
+                obj.__setattr__(attributeExpandedList[-1], a.path)
+            elif a.numArgs == -2:   # add as ", "-delimited string
+                obj.__setattr__(attributeExpandedList[-1], ", ".join([str(x) for x in a.path]))
             elif len(a.path) == 0:
-                pass    ## empty - may not be required - use validation to check
+                pass    # empty - may not be required - use validation to check
             else:
-                print(f"Error: Incorrect number of arguments in {a.attribName}. Expected {a.numArgs}, but found {len(a.path)}.")
+                print(f"Error: Incorrect number of arguments in {a.attributeName}. Expected {a.numArgs}, but found {len(a.path)}.")
     p.updateTelecom()
     p.updateRRContent()
 
-    ## Validation
-    ## ...
+    ### Validation / Transform
+
+    ## birthDate:
+    if not re.match(r'^\d{8}$', p.birthDate):   # validate: format should be in "YYYYMMDD"
+        print(f"FATAL ERROR: Invalid date format found.\n\tPerson ID: {p.id}\n\tDOB: {p.birthDate}\n")
+        exit(1)
+    p.birthDate = re.sub(r'^(\d{4})(\d{2})(\d{2})$', r'\2-\3-\1', p.birthDate)   # transform
+
+    ## isDead & deathDate:
+    if p.isDead == "false":
+        p.isDead = False
+    elif p.isDead == "true":
+        p.isDead = True
+        if p.deathDate == None:
+            print("Invalid information: If patient is dead, death date must be specified.")
+
+    ## ... (add further validation rules / data transformations here)
 
     return p
 
@@ -226,9 +237,9 @@ def unzipFiles(zipDir: str, unzipDir: str) -> None:
         with ZipFile((os.sep).join([zipDir,zipFile]), 'r') as z:
             z.extractall((os.sep).join([unzipDir,zipFile])[:-4])
 
-def acquireEcrFileList(xmlRootDir: str, eICRDocument: str, RRDocument: str) -> list[list[str]]:
+def acquireEcrFileList(xmlRootDir: str, eICRDocument: str, rrDocument: str) -> list[list[str]]:
     xmlSubDirList: list[str] = os.listdir(xmlRootDir)
-    ecrXmlFiles: list[str] = [[(os.sep).join([xmlRootDir,x,eICRDocument]), (os.sep).join([xmlRootDir,x,RRDocument])] for x in xmlSubDirList if os.path.isfile((os.sep).join([xmlRootDir,x,eICRDocument])) and os.path.isfile((os.sep).join([xmlRootDir,x,RRDocument]))]
+    ecrXmlFiles: list[str] = [[(os.sep).join([xmlRootDir,x,eICRDocument]), (os.sep).join([xmlRootDir,x,rrDocument])] for x in xmlSubDirList if os.path.isfile((os.sep).join([xmlRootDir,x,eICRDocument])) and os.path.isfile((os.sep).join([xmlRootDir,x,rrDocument]))]
     return(ecrXmlFiles)
 
 def ecrFileListOverride() -> list[list[str]]:
@@ -247,9 +258,6 @@ def processEcrFileList(ecrXmlFiles: list[list[str]], outputFileName: str, delim:
             root1: etree._Element = xmltree1.getroot()
             xmltree2: etree._ElementTree = etree.parse(xmlFile2)
             root2: etree._Element = xmltree2.getroot()
-        #namespace = root.tag[1:].split("}")[0] ## in case capturing namespace is important
-        #for record in root.findall('{' + namespace + '}title'):
-        #    print(record.text) ## or, you know, do something more useful
         ## (strip all namespaces):
         for element in root1.getiterator():
             if not (isinstance(element, etree._Comment) or isinstance(element, etree._ProcessingInstruction)):
